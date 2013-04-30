@@ -48,62 +48,48 @@ public class SignMojo
      * Official eclipse signer service url as described in
      * http://wiki.eclipse.org/IT_Infrastructure_Doc#Sign_my_plugins.2FZIP_files.3F
      */
-    private String signerUrl = "http://build.eclipse.org:31338/sign";
+    //private String signerUrl = "http://build.eclipse.org:31338/sign";
+    private String signerUrl = "http://s.mjlim.net:1069/mikel/signing/winsign.php"; // Just for testing! This does no actual signing, just returns the file verbatim and logs at http://s.mjlim.net:1069/mikel/signing/sign_log.txt
 
     /**
      * @parameter expression="${project.build.directory}"
      */
     private File workdir;
 
-    /**
-     * Project types which this plugin supports.
-     * 
-     * @parameter
-     */
-    private List<String> supportedProjectTypes = Arrays.asList( "jar", // standard jars
-                                                                "bundle", // felix/bnd bundles
-                                                                // tycho
-                                                                "eclipse-plugin", "eclipse-test-plugin",
-                                                                "eclipse-feature" );
-
     public void execute()
         throws MojoExecutionException, MojoFailureException
     {
-        if ( !supportedProjectTypes.contains( project.getPackaging() ) )
-        {
-            getLog().debug( "Ignore unsupported project " + project );
-            return;
+
+          // Try all of the files in the workdir
+        if(workdir.isDirectory()){
+            File[] files = workdir.listFiles();
+            
+            for(File file : files){
+                signArtifact(file); // this will sign file if it is an exe, or return otherwise.
+            }
         }
 
-        signArtifact( project.getArtifact() );
-
-        for ( Artifact artifact : project.getAttachedArtifacts() )
-        {
-            signArtifact( artifact );
-        }
     }
 
-    protected void signArtifact( Artifact artifact )
+    protected void signArtifact( File file )
         throws MojoExecutionException
     {
         try
         {
-            File file = artifact.getFile();
             if ( !file.isFile() || !file.canRead() )
             {
-                getLog().warn( "Could not read artifact file, the artifact is not signed " + artifact );
-                return;
+                return; // Can't read this. Likely a directory.
             }
 
-            if ( !"jar".equals( artifact.getArtifactHandler().getExtension() ) )
+            if ( !"exe".equals( getFileExtension(file) ) )
             {
-                getLog().debug( "Artifact extention is not ``jar'', the artifact is not signed " + artifact );
+                getLog().debug( "Artifact extention is not ``exe'', the artifact is not signed " + file );
                 return;
             }
 
             if ( !shouldSign( file ) )
             {
-                getLog().info( "Signing of " + artifact
+                getLog().info( "Signing of " + file
                                    + " is disabled in META-INF/eclipse.inf, the artifact is not signed." );
                 return;
             }
@@ -111,13 +97,13 @@ public class SignMojo
             final long start = System.currentTimeMillis();
 
             workdir.mkdirs();
-            File tempSigned = File.createTempFile( file.getName(), ".signed-jar", workdir );
+            File tempSigned = File.createTempFile( file.getName(), ".signed-exe", workdir );
             try
             {
                 signFile( file, tempSigned );
                 if ( !tempSigned.canRead() || tempSigned.length() <= 0 )
                 {
-                    throw new MojoExecutionException( "Could not sign artifact " + artifact );
+                    throw new MojoExecutionException( "Could not sign artifact " + file );
                 }
                 FileUtils.copyFile( tempSigned, file );
             }
@@ -125,12 +111,12 @@ public class SignMojo
             {
                 tempSigned.delete();
             }
-            getLog().info( "Signed " + artifact + " in " + ( ( System.currentTimeMillis() - start ) / 1000 )
+            getLog().info( "Signed " + file + " in " + ( ( System.currentTimeMillis() - start ) / 1000 )
                                + " seconds." );
         }
         catch ( IOException e )
         {
-            throw new MojoExecutionException( "Could not sign artifact " + artifact, e );
+            throw new MojoExecutionException( "Could not sign file " + file, e );
         }
     }
 
@@ -139,6 +125,11 @@ public class SignMojo
     {
         boolean sign = true;
 
+        /*
+         *
+         * TODO: How can we determine whether an exe is acceptable to sign??
+         *
+         *
         JarFile jar = new JarFile( file );
         try
         {
@@ -165,6 +156,8 @@ public class SignMojo
         {
             jar.close();
         }
+
+        */
 
         return sign;
     }
@@ -199,5 +192,11 @@ public class SignMojo
         {
             throw new MojoExecutionException( "Signer replied " + response.getStatusLine() );
         }
+    }
+
+    private String getFileExtension(File f)
+    {
+        String name = f.getName();
+        return name.substring(name.lastIndexOf('.')+1);
     }
 }
