@@ -1,13 +1,8 @@
-package org.eclipse.cbi.maven.plugins.jarsigner;
+package org.eclipse.cbi.maven.plugins.winsigner;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.jar.JarFile;
-import java.util.zip.ZipEntry;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -16,7 +11,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
