@@ -53,16 +53,27 @@ public class SignMojo
     public void execute()
         throws MojoExecutionException, MojoFailureException
     {
-
-          // Try all of the files in the workdir
+        // Try all of the files in the workdir
         if(workdir.isDirectory()){
-            File[] files = workdir.listFiles();
-            
-            for(File file : files){
-                signArtifact(file); // this will sign file if it is an exe, or return otherwise.
-            }
+           traverseDirectory(workdir.listFiles());
         }
 
+    }
+    
+    /**
+     * TODO: brute force right now. determine how to set the starting dir.
+     * @param files
+     * @throws MojoExecutionException
+     */
+    private void traverseDirectory(File[] files) throws MojoExecutionException {
+        for(File file : files){
+        	if (file.isDirectory()) {
+        		traverseDirectory(file.listFiles());
+        	} else if (file.isFile()){
+        		getLog().info(file.getAbsolutePath());
+        		signArtifact(file); // this will sign file if it is an exe, or return otherwise.
+        	}
+        }
     }
 
     protected void signArtifact( File file )
