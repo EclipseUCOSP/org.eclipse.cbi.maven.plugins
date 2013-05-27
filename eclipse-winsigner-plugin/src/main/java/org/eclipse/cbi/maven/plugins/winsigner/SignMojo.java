@@ -14,15 +14,13 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.IOUtil;
 import org.codehaus.plexus.util.io.RawInputStreamFacade;
 
 /**
- * Signs project main and attached artifact using <a
- * href="http://wiki.eclipse.org/IT_Infrastructure_Doc#Sign_my_plugins.2FZIP_files.3F">Eclipse jarsigner webservice</a>.
- * Only artifacts that have extension ``.jar'', other artifacts are not signed with a debug log message.
+ * Signs project main and attached artifact using 
+ * <a>href="http://wiki.eclipse.org/IT_Infrastructure_Doc#Sign_my_plugins.2FZIP_files.3F">Eclipse winsigner webservice</a>.
  * 
  * @goal sign
  * @phase package
@@ -32,13 +30,7 @@ import org.codehaus.plexus.util.io.RawInputStreamFacade;
 public class SignMojo
     extends AbstractMojo
 {
-
-    /**
-     * @parameter expression="${project}"
-     */
-    private MavenProject project;
-
-    /**
+	/**
      * Official eclipse signer service url as described in
      * http://wiki.eclipse.org/IT_Infrastructure_Doc#Sign_my_plugins.2FZIP_files.3F
      */
@@ -49,31 +41,111 @@ public class SignMojo
      * @parameter expression="${project.build.directory}"
      */
     private File workdir;
+    
+    /**
+     * @parameter expression="${project.artifactId}"
+     */
+    private String artifactID;
+    
+    /**
+     * List of full executable paths.
+     * If configured only these executables will be signed.
+     * @parameter expression="${signFiles}"
+     */
+    private String[] signFiles;
+    
+    /**
+     * Base dir to search for executables to sign.
+     * If NOT configured baseSearchDir is ${project.build.directory}/products/${project.artifactId/}
+     * @parameter expression="${baseSearchDir}
+     */
+    private String baseSearchDir;
+    
+    /**
+     * List of file names to sign.
+     * If NOT configured 'eclipse.exe' and 'eclipsec.exe' are signed. 
+     * @parameter expression="${fileNames}
+     */
+    private String[] fileNames;
 
     public void execute()
         throws MojoExecutionException, MojoFailureException
-    {
-        // Try all of the files in the workdir
-        if(workdir.isDirectory()){
-           traverseDirectory(workdir.listFiles());
-        }
+    {    	
+    	//exe paths are configured
+    	if (signFiles != null && !(signFiles.length == 0)) {
+        	for (String path : signFiles) {
+        		signArtifact(new File(path));
+        	}
+    	}
+    	else { //perform search
+        	if (fileNames == null || fileNames.length == 0) {
+        		fileNames = new String[2];
+        		fileNames[0] = "eclipse.exe";
+        		fileNames[1] = "eclipsec.exe";
+        	}
+    		File searchDir = getSearchDir();
+    		if (searchDir != null) { 
+    			traverseDirectory(searchDir);
+    		}
+    	}
 
     }
     
     /**
-     * TODO: brute force right now. determine how to set the starting dir.
+     * @return Directory to start the search from or 
+     * 		   null if the directory cannot be found. A file
+     * 		   will not be returned.
+     */
+    private File getSearchDir() {
+    	//base search dir is set
+    	if (baseSearchDir != null && !baseSearchDir.isEmpty()) {
+    		File dir = new File(baseSearchDir);
+    		if(dir.isDirectory()) {
+    			return dir;
+    		}else {
+    			getLog().error(dir + " is not a valid directory, failed to sign artifacts.");
+    			return null;
+    		}
+    	} else { //deriving search path
+    		if (artifactID == null || artifactID.isEmpty()) {
+    			getLog().error("${project.artifactID} is not available, failed to sign artifacts.");
+    			return null;
+    		}
+    		StringBuffer path = new StringBuffer(workdir.getPath());
+    		path.append("/products/");
+    		path.append(artifactID);
+    		File dir = new File(path.toString());
+    		
+    		if(dir.isDirectory()) {
+    			return dir;
+    		}else {
+    			getLog().error("Derived directory: " + dir + " is not a valid directory, failed to sign artifacts.");
+    			return null;
+    		}
+    	}
+    }
+    
+    /**
+     * searches the base directory for files to sign
      * @param files
      * @throws MojoExecutionException
      */
-    private void traverseDirectory(File[] files) throws MojoExecutionException {
-        for(File file : files){
-        	if (file.isDirectory()) {
-        		traverseDirectory(file.listFiles());
-        	} else if (file.isFile()){
-        		getLog().info(file.getAbsolutePath());
-        		signArtifact(file); // this will sign file if it is an exe, or return otherwise.
-        	}
-        }
+    private void traverseDirectory(File dir) throws MojoExecutionException {
+    	if (dir.isDirectory()) {
+    		getLog().debug("searching " + dir.getAbsolutePath());
+    		for(File file : dir.listFiles()){
+    			if (file.isFile()){
+    				String fileName = file.getName();
+    				for(String allowedName : fileNames) {
+    					if (fileName.equals(allowedName)) {
+    						signArtifact(file); // signs the file
+    					}
+    				}
+    			} else if (file.isDirectory()) {
+    				traverseDirectory(file);
+    			}
+    		}
+    	}
     }
 
     protected void signArtifact( File file )
@@ -81,17 +153,12 @@ public class SignMojo
     {
         try
         {
-            if ( !file.isFile() || !file.canRead() )
+            if ( !file.isFile() || !file.canRead())
             {
+            	getLog().warn(file + " is either not a file or cannot be read, the artifact is not signed.");
                 return; // Can't read this. Likely a directory.
             }
-
-            if ( !"exe".equals( getFileExtension(file) ) )
-            {
-                getLog().debug( "Artifact extention is not ``exe'', the artifact is not signed " + file );
-                return;
-            }
-
+            //TODO: conditions where an artifact should not be signed?
             if ( !shouldSign( file ) )
             {
                 getLog().info( "Signing of " + file
@@ -197,11 +264,5 @@ public class SignMojo
         {
             throw new MojoExecutionException( "Signer replied " + response.getStatusLine() );
         }
-    }
-
-    private String getFileExtension(File f)
-    {
-        String name = f.getName();
-        return name.substring(name.lastIndexOf('.')+1);
     }
 }
