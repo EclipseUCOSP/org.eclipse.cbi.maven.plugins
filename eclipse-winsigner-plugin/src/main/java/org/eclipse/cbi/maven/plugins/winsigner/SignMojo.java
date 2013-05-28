@@ -159,6 +159,11 @@ public class SignMojo
     	}
     }
 
+    /**
+     * signs the file
+     * @param file
+     * @throws MojoExecutionException
+     */
     protected void signArtifact( File file )
         throws MojoExecutionException
     {
@@ -176,7 +181,7 @@ public class SignMojo
             File tempSigned = File.createTempFile( file.getName(), ".signed-exe", workdir );
             try
             {
-                signFile( file, tempSigned );
+                postFile( file, tempSigned );
                 if ( !tempSigned.canRead() || tempSigned.length() <= 0 )
                 {
                     throw new MojoExecutionException( "Could not sign artifact " + file );
@@ -196,7 +201,14 @@ public class SignMojo
         }
     }
 
-    private void signFile( File source, File target )
+    /**
+     * helper to send the file to the signing service
+     * @param source file to send
+     * @param target file to copy response to
+     * @throws IOException
+     * @throws MojoExecutionException
+     */
+    private void postFile( File source, File target )
         throws IOException, MojoExecutionException
     {
         HttpClient client = new DefaultHttpClient();
