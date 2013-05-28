@@ -1,3 +1,14 @@
+/*******************************************************************************
+ * Copyright (c) 2013 Eclipse Foundation and others 
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ * 
+ * Contributors:
+ * Caroline McQuatt, Mike Lim - initial implementation
+ *******************************************************************************/
+
 package org.eclipse.cbi.maven.plugins.winsigner;
 
 import java.io.File;
@@ -158,13 +169,6 @@ public class SignMojo
             	getLog().warn(file + " is either not a file or cannot be read, the artifact is not signed.");
                 return; // Can't read this. Likely a directory.
             }
-            //TODO: conditions where an artifact should not be signed?
-            if ( !shouldSign( file ) )
-            {
-                getLog().info( "Signing of " + file
-                                   + " is disabled in META-INF/eclipse.inf, the artifact is not signed." );
-                return;
-            }
 
             final long start = System.currentTimeMillis();
 
@@ -190,48 +194,6 @@ public class SignMojo
         {
             throw new MojoExecutionException( "Could not sign file " + file, e );
         }
-    }
-
-    private boolean shouldSign( File file )
-        throws IOException
-    {
-        boolean sign = true;
-
-        /*
-         *
-         * TODO: How can we determine whether an exe is acceptable to sign??
-         *
-         *
-        JarFile jar = new JarFile( file );
-        try
-        {
-            ZipEntry entry = jar.getEntry( "META-INF/eclipse.inf" );
-            if ( entry != null )
-            {
-                InputStream is = jar.getInputStream( entry );
-                Properties eclipseInf = new Properties();
-                try
-                {
-                    eclipseInf.load( is );
-                }
-                finally
-                {
-                    is.close();
-                }
-
-                sign =
-                    !Boolean.parseBoolean( eclipseInf.getProperty( "jarprocessor.exclude" ) )
-                        && !Boolean.parseBoolean( eclipseInf.getProperty( "jarprocessor.exclude.sign" ) );
-            }
-        }
-        finally
-        {
-            jar.close();
-        }
-
-        */
-
-        return sign;
     }
 
     private void signFile( File source, File target )
